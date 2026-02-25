@@ -3,6 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
 import { AppSidebar } from "@/components/layout/app-sidebar";
+import { QuickAddDialog } from "@/components/quick-add/quick-add-dialog";
+import { ThemeToggle } from "@/components/layout/theme-toggle";
 
 const isMock = process.env.NEXT_PUBLIC_MOCK_MODE === "true";
 
@@ -12,8 +14,8 @@ export default async function AppLayout({
   children: React.ReactNode;
 }) {
   let userInfo = {
-    email: "student@university.edu",
-    full_name: "Alex Johnson" as string | undefined,
+    email: "laith.shareiyat@ox.ac.uk",
+    full_name: "Laith Shareiyat" as string | undefined,
   };
 
   if (!isMock) {
@@ -46,9 +48,13 @@ export default async function AppLayout({
         <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
           <SidebarTrigger className="-ml-1" />
           <Separator orientation="vertical" className="mr-2 h-4" />
+          <div className="ml-auto flex items-center gap-2">
+            <ThemeToggle />
+          </div>
         </header>
         <main className="flex-1 overflow-auto p-4 md:p-6">{children}</main>
       </SidebarInset>
+      <QuickAddDialog />
     </SidebarProvider>
   );
 }

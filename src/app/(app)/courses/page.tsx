@@ -28,6 +28,13 @@ const COLORS = [
   "#EC4899", "#06B6D4", "#F97316",
 ];
 
+const OXFORD_TERMS = ["Michaelmas", "Hilary", "Trinity"];
+const CURRENT_YEAR = new Date().getFullYear();
+const TERM_OPTIONS = OXFORD_TERMS.flatMap((t) => [
+  `${t} ${CURRENT_YEAR}`,
+  `${t} ${CURRENT_YEAR + 1}`,
+]);
+
 export default function CoursesPage() {
   const { data: courses, isLoading } = useCourses(false);
   const createCourse = useCreateCourse();
@@ -95,11 +102,18 @@ export default function CoursesPage() {
                 </div>
                 <div className="space-y-2">
                   <Label>Term</Label>
-                  <Input
-                    placeholder="e.g. Spring 2026"
+                  <select
                     value={term}
                     onChange={(e) => setTerm(e.target.value)}
-                  />
+                    className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  >
+                    <option value="">— None —</option>
+                    {TERM_OPTIONS.map((t) => (
+                      <option key={t} value={t}>
+                        {t}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
               <div className="space-y-2">
@@ -149,8 +163,8 @@ export default function CoursesPage() {
       ) : courses && courses.length > 0 ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {courses.map((course) => (
-            <Link key={course.id} href={`/courses/${course.id}`}>
-              <Card className="transition-shadow hover:shadow-md cursor-pointer">
+            <Link key={course.id} href={`/courses/${course.id}`} className="h-full">
+              <Card className="h-full transition-shadow hover:shadow-md cursor-pointer">
                 <CardHeader className="pb-3">
                   <div className="flex items-center gap-3">
                     <div

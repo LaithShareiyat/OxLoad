@@ -3,7 +3,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { Course, CourseInsert, CourseUpdate } from "@/types/database";
-import { MOCK_COURSES } from "@/lib/mock-data";
+import { MOCK_COURSES, MOCK_USER } from "@/lib/mock-data";
 
 const isMock = process.env.NEXT_PUBLIC_MOCK_MODE === "true";
 
@@ -42,7 +42,24 @@ export function useCreateCourse() {
   return useMutation({
     mutationFn: async (course: Omit<CourseInsert, "user_id">) => {
       if (isMock) {
-        return { ...course, id: `mock-course-${Date.now()}`, user_id: "mock-user-id" };
+        const now = new Date().toISOString();
+        const newCourse: Course = {
+          id: `mock-course-${Date.now()}`,
+          user_id: MOCK_USER.id,
+          canvas_course_id: null,
+          name: course.name,
+          code: course.code ?? null,
+          color: course.color ?? "#3B82F6",
+          term: course.term ?? null,
+          instructor: course.instructor ?? null,
+          credits: course.credits ?? null,
+          is_active: true,
+          canvas_last_synced_at: null,
+          created_at: now,
+          updated_at: now,
+        };
+        MOCK_COURSES.push(newCourse);
+        return newCourse;
       }
 
       const {
@@ -72,7 +89,16 @@ export function useUpdateCourse() {
   return useMutation({
     mutationFn: async ({ id, ...updates }: CourseUpdate & { id: string }) => {
       if (isMock) {
-        return { id, ...updates };
+        const idx = MOCK_COURSES.findIndex((c) => c.id === id);
+        if (idx !== -1) {
+          MOCK_COURSES[idx] = {
+            ...MOCK_COURSES[idx],
+            ...updates,
+            updated_at: new Date().toISOString(),
+          };
+          return MOCK_COURSES[idx];
+        }
+        return { id, ...updates } as Course;
       }
 
       const { data, error } = await supabase

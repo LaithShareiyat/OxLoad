@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useTasks, useCreateTask, useUpdateTask, useDeleteTask } from "@/hooks/use-tasks";
 import { useCourses } from "@/hooks/use-courses";
 import { TaskCard } from "@/components/tasks/task-card";
+import { KanbanView } from "@/components/tasks/kanban-view";
 import { TaskForm } from "@/components/tasks/task-form";
 import { Button } from "@/components/ui/button";
 import {
@@ -22,7 +23,7 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus } from "lucide-react";
+import { Plus, List, Kanban } from "lucide-react";
 import { TaskStatus } from "@/types/database";
 import { toast } from "sonner";
 
@@ -30,6 +31,7 @@ export default function TasksPage() {
   const [statusFilter, setStatusFilter] = useState<string>("active");
   const [courseFilter, setCourseFilter] = useState<string>("all");
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<"list" | "kanban">("list");
 
   const statusMap: Record<string, TaskStatus | TaskStatus[] | undefined> = {
     all: undefined,
@@ -82,23 +84,47 @@ export default function TasksPage() {
             Manage your assignments and to-dos
           </p>
         </div>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              New Task
+        <div className="flex items-center gap-2">
+          {/* View mode toggle */}
+          <div className="flex items-center rounded-md border p-1">
+            <Button
+              variant={viewMode === "list" ? "secondary" : "ghost"}
+              size="sm"
+              className="h-7 w-7 p-0"
+              onClick={() => setViewMode("list")}
+              title="List view"
+            >
+              <List className="h-3.5 w-3.5" />
             </Button>
-          </DialogTrigger>
-          <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
-            <DialogHeader>
-              <DialogTitle>Create Task</DialogTitle>
-            </DialogHeader>
-            <TaskForm
-              onSubmit={handleCreate}
-              isLoading={createTask.isPending}
-            />
-          </DialogContent>
-        </Dialog>
+            <Button
+              variant={viewMode === "kanban" ? "secondary" : "ghost"}
+              size="sm"
+              className="h-7 w-7 p-0"
+              onClick={() => setViewMode("kanban")}
+              title="Kanban view"
+            >
+              <Kanban className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="mr-2 h-4 w-4" />
+                New Task
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
+              <DialogHeader>
+                <DialogTitle>Create Task</DialogTitle>
+              </DialogHeader>
+              <TaskForm
+                onSubmit={handleCreate}
+                isLoading={createTask.isPending}
+              />
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       {/* Filters */}
@@ -130,7 +156,7 @@ export default function TasksPage() {
         </Select>
       </div>
 
-      {/* Task list */}
+      {/* Task list / kanban */}
       {isLoading ? (
         <div className="space-y-3">
           {[...Array(5)].map((_, i) => (
@@ -138,38 +164,64 @@ export default function TasksPage() {
           ))}
         </div>
       ) : tasks && tasks.length > 0 ? (
-        <div className="space-y-3">
-          {tasks.map((task) => (
-            <TaskCard
-              key={task.id}
-              task={task}
-              onStatusChange={(id, status) =>
-                updateTask.mutate(
-                  { id, status },
-                  {
-                    onSuccess: () =>
-                      toast.success(
-                        status === "completed"
-                          ? "Task completed!"
-                          : "Task updated"
-                      ),
-                  }
-                )
-              }
-              onDelete={(id) =>
-                deleteTask.mutate(id, {
-                  onSuccess: () => toast.success("Task deleted"),
-                  onError: (error) =>
-                    toast.error("Failed to delete: " + error.message),
-                })
-              }
-              onEdit={(id) => {
-                // TODO: navigate to edit page or open edit dialog
-                window.location.href = `/tasks/${id}`;
-              }}
-            />
-          ))}
-        </div>
+        viewMode === "kanban" ? (
+          <KanbanView
+            tasks={tasks}
+            onStatusChange={(id, status) =>
+              updateTask.mutate(
+                { id, status },
+                {
+                  onSuccess: () =>
+                    toast.success(
+                      status === "completed" ? "Task completed!" : "Task updated"
+                    ),
+                }
+              )
+            }
+            onDelete={(id) =>
+              deleteTask.mutate(id, {
+                onSuccess: () => toast.success("Task deleted"),
+                onError: (error) =>
+                  toast.error("Failed to delete: " + error.message),
+              })
+            }
+            onEdit={(id) => {
+              window.location.href = `/tasks/${id}`;
+            }}
+          />
+        ) : (
+          <div className="space-y-3">
+            {tasks.map((task) => (
+              <TaskCard
+                key={task.id}
+                task={task}
+                onStatusChange={(id, status) =>
+                  updateTask.mutate(
+                    { id, status },
+                    {
+                      onSuccess: () =>
+                        toast.success(
+                          status === "completed"
+                            ? "Task completed!"
+                            : "Task updated"
+                        ),
+                    }
+                  )
+                }
+                onDelete={(id) =>
+                  deleteTask.mutate(id, {
+                    onSuccess: () => toast.success("Task deleted"),
+                    onError: (error) =>
+                      toast.error("Failed to delete: " + error.message),
+                  })
+                }
+                onEdit={(id) => {
+                  window.location.href = `/tasks/${id}`;
+                }}
+              />
+            ))}
+          </div>
+        )
       ) : (
         <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-16">
           <p className="text-muted-foreground">No tasks found</p>

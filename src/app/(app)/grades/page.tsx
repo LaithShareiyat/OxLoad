@@ -10,29 +10,20 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
-import { BarChart3, Calculator } from "lucide-react";
+import { BarChart3, Calculator, ArrowRight } from "lucide-react";
 import {
-  calculateGpa,
-  percentageToLetter,
-  type GpaScale,
+  calculateClassification,
+  whatIfClassification,
+  percentageToClassification,
 } from "@/lib/utils/gpa";
 
 export default function GradesPage() {
   const { data: tasks, isLoading: tasksLoading } = useTasks();
   const { data: courses, isLoading: coursesLoading } = useCourses();
-  const [gpaScale, setGpaScale] = useState<GpaScale>("4.0");
   const [whatIfGrades, setWhatIfGrades] = useState<
     Record<string, { earned: string; possible: string }>
   >({});
@@ -49,49 +40,42 @@ export default function GradesPage() {
     [tasks]
   );
 
-  // Calculate GPA from actual grades
-  const gpaResult = useMemo(() => {
+  // Calculate overall classification
+  const overallResult = useMemo(() => {
     const entries = gradedTasks.map((t) => ({
       pointsEarned: t.points_earned!,
       pointsPossible: t.points_possible!,
       weight: t.weight || undefined,
     }));
-    return calculateGpa(entries, gpaScale);
-  }, [gradedTasks, gpaScale]);
+    return calculateClassification(entries);
+  }, [gradedTasks]);
 
   // Calculate per-course grades
   const courseGrades = useMemo(() => {
     if (!courses || !gradedTasks) return [];
 
-    return courses.map((course) => {
-      const courseTasks = gradedTasks.filter(
-        (t) => t.course_id === course.id
-      );
-      const totalEarned = courseTasks.reduce(
-        (s, t) => s + (t.points_earned || 0),
-        0
-      );
-      const totalPossible = courseTasks.reduce(
-        (s, t) => s + (t.points_possible || 0),
-        0
-      );
-      const percentage =
-        totalPossible > 0 ? (totalEarned / totalPossible) * 100 : null;
-      const letter = percentage !== null ? percentageToLetter(percentage, gpaScale) : null;
+    return courses
+      .map((course) => {
+        const courseTasks = gradedTasks.filter((t) => t.course_id === course.id);
+        const totalEarned = courseTasks.reduce((s, t) => s + (t.points_earned || 0), 0);
+        const totalPossible = courseTasks.reduce((s, t) => s + (t.points_possible || 0), 0);
+        const percentage = totalPossible > 0 ? (totalEarned / totalPossible) * 100 : null;
+        const classification = percentage !== null ? percentageToClassification(percentage) : null;
 
-      return {
-        course,
-        gradedCount: courseTasks.length,
-        totalEarned,
-        totalPossible,
-        percentage,
-        letter,
-      };
-    }).filter((c) => c.gradedCount > 0);
-  }, [courses, gradedTasks, gpaScale]);
+        return {
+          course,
+          gradedCount: courseTasks.length,
+          totalEarned,
+          totalPossible,
+          percentage,
+          classification,
+        };
+      })
+      .filter((c) => c.gradedCount > 0);
+  }, [courses, gradedTasks]);
 
   // What-if calculation
-  const projectedGpa = useMemo(() => {
+  const whatIfResult = useMemo(() => {
     const realEntries = gradedTasks.map((t) => ({
       pointsEarned: t.points_earned!,
       pointsPossible: t.points_possible!,
@@ -107,33 +91,19 @@ export default function GradesPage() {
 
     if (hypothetical.length === 0) return null;
 
-    return calculateGpa([...realEntries, ...hypothetical], gpaScale);
-  }, [gradedTasks, whatIfGrades, gpaScale]);
+    return whatIfClassification(realEntries, hypothetical);
+  }, [gradedTasks, whatIfGrades]);
 
   const isLoading = tasksLoading || coursesLoading;
+  const { result: overall } = overallResult;
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Grades</h1>
-          <p className="text-muted-foreground">
-            Track your grades and GPA across courses
-          </p>
-        </div>
-        <Select
-          value={gpaScale}
-          onValueChange={(v) => setGpaScale(v as GpaScale)}
-        >
-          <SelectTrigger className="w-[140px]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="4.0">4.0 Scale</SelectItem>
-            <SelectItem value="4.3">4.3 Scale</SelectItem>
-            <SelectItem value="uk">UK Classification</SelectItem>
-          </SelectContent>
-        </Select>
+      <div>
+        <h1 className="text-2xl font-bold">Grades</h1>
+        <p className="text-muted-foreground">
+          Track your grades and degree classification across courses
+        </p>
       </div>
 
       {isLoading ? (
@@ -144,23 +114,23 @@ export default function GradesPage() {
         </div>
       ) : (
         <>
-          {/* GPA Overview */}
+          {/* Classification overview */}
           <div className="grid gap-4 sm:grid-cols-3">
             <Card>
               <CardContent className="pt-6 text-center">
-                <p className="text-sm text-muted-foreground">Current GPA</p>
-                <p className="mt-1 text-4xl font-bold">
-                  {gradedTasks.length > 0 ? gpaResult.gpa.toFixed(2) : "N/A"}
-                </p>
-                {gradedTasks.length > 0 && (
-                  <Badge variant="secondary" className="mt-2">
-                    {gpaResult.letterGrade}
-                  </Badge>
-                )}
-                {gpaResult.classification && (
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    {gpaResult.classification}
-                  </p>
+                <p className="text-sm text-muted-foreground">Classification</p>
+                {gradedTasks.length > 0 && overall ? (
+                  <>
+                    <p className="mt-1 text-4xl font-bold" style={{ color: overall.color }}>
+                      {overall.shortLabel}
+                    </p>
+                    <p className="mt-1 text-sm font-medium">{overall.classification}</p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {overall.percentage.toFixed(1)}% overall
+                    </p>
+                  </>
+                ) : (
+                  <p className="mt-1 text-4xl font-bold text-muted-foreground">N/A</p>
                 )}
               </CardContent>
             </Card>
@@ -178,24 +148,42 @@ export default function GradesPage() {
 
             <Card>
               <CardContent className="pt-6 text-center">
-                <p className="text-sm text-muted-foreground">
-                  {projectedGpa ? "Projected GPA" : "What-If GPA"}
-                </p>
-                <p className="mt-1 text-4xl font-bold">
-                  {projectedGpa ? projectedGpa.gpa.toFixed(2) : "--"}
-                </p>
-                {projectedGpa && (
-                  <Badge
-                    variant={
-                      projectedGpa.gpa >= gpaResult.gpa
-                        ? "default"
-                        : "destructive"
-                    }
-                    className="mt-2"
-                  >
-                    {projectedGpa.gpa >= gpaResult.gpa ? "+" : ""}
-                    {(projectedGpa.gpa - gpaResult.gpa).toFixed(2)}
-                  </Badge>
+                <p className="text-sm text-muted-foreground">What-If Projection</p>
+                {whatIfResult?.projected ? (
+                  <div className="mt-2 flex flex-col items-center gap-1">
+                    <div className="flex items-center gap-2 text-sm">
+                      <span
+                        className="font-semibold"
+                        style={{ color: whatIfResult.current?.color ?? "#6B7280" }}
+                      >
+                        {whatIfResult.current?.shortLabel ?? "N/A"}
+                      </span>
+                      <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                      <span
+                        className="font-semibold"
+                        style={{ color: whatIfResult.projected.color }}
+                      >
+                        {whatIfResult.projected.shortLabel}
+                      </span>
+                    </div>
+                    <p
+                      className="text-2xl font-bold"
+                      style={{ color: whatIfResult.projected.color }}
+                    >
+                      {whatIfResult.projected.percentage.toFixed(1)}%
+                    </p>
+                    {whatIfResult.current?.classification !==
+                      whatIfResult.projected.classification && (
+                      <Badge
+                        variant="default"
+                        style={{ backgroundColor: whatIfResult.projected.color }}
+                      >
+                        {whatIfResult.projected.classification}
+                      </Badge>
+                    )}
+                  </div>
+                ) : (
+                  <p className="mt-1 text-4xl font-bold text-muted-foreground">--</p>
                 )}
               </CardContent>
             </Card>
@@ -213,7 +201,7 @@ export default function GradesPage() {
               <CardContent>
                 <div className="space-y-4">
                   {courseGrades.map(
-                    ({ course, gradedCount, totalEarned, totalPossible, percentage, letter }) => (
+                    ({ course, gradedCount, totalEarned, totalPossible, percentage, classification }) => (
                       <div key={course.id} className="space-y-2">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
@@ -229,15 +217,23 @@ export default function GradesPage() {
                             </span>
                           </div>
                           <div className="flex items-center gap-2">
-                            <span className="text-sm">
+                            <span className="text-sm text-muted-foreground">
                               {totalEarned.toFixed(1)}/{totalPossible.toFixed(1)}
                             </span>
-                            {percentage !== null && (
+                            {percentage !== null && classification && (
                               <>
                                 <span className="font-medium">
                                   {percentage.toFixed(1)}%
                                 </span>
-                                <Badge variant="outline">{letter}</Badge>
+                                <Badge
+                                  variant="outline"
+                                  style={{
+                                    borderColor: classification.color,
+                                    color: classification.color,
+                                  }}
+                                >
+                                  {classification.shortLabel}
+                                </Badge>
                               </>
                             )}
                           </div>
@@ -269,7 +265,7 @@ export default function GradesPage() {
                 What-If Calculator
               </CardTitle>
               <CardDescription>
-                Add hypothetical grades to see how they would affect your GPA
+                Add hypothetical grades to see how they would affect your classification
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -278,14 +274,16 @@ export default function GradesPage() {
                 const grade = whatIfGrades[key] || { earned: "", possible: "" };
                 return (
                   <div key={key} className="grid grid-cols-3 gap-4">
-                    <div className="space-y-1">
-                      <Label className="text-xs">Assignment {idx + 1}</Label>
+                    <div className="flex items-end pb-1">
+                      <span className="text-sm text-muted-foreground">
+                        Assignment {idx + 1}
+                      </span>
                     </div>
                     <div className="space-y-1">
                       <Label className="text-xs">Score</Label>
                       <Input
                         type="number"
-                        placeholder="85"
+                        placeholder="68"
                         value={grade.earned}
                         onChange={(e) =>
                           setWhatIfGrades((prev) => ({

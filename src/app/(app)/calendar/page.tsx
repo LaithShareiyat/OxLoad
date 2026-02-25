@@ -1,32 +1,42 @@
 "use client";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Calendar } from "lucide-react";
+import { useMemo } from "react";
+import { useTasks } from "@/hooks/use-tasks";
+import { MonthView } from "@/components/calendar/month-view";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function CalendarPage() {
+  const { data: tasks, isLoading } = useTasks();
+
+  const taskSummaries = useMemo(
+    () =>
+      (tasks || []).map((t) => ({
+        id: t.id,
+        title: t.title,
+        due_date: t.due_date,
+        color: t.courses?.color ?? "#6B7280",
+        status: t.status,
+      })),
+    [tasks]
+  );
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold">Calendar</h1>
         <p className="text-muted-foreground">
-          View your schedule and deadlines
+          View your deadlines and schedule
         </p>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Calendar className="h-5 w-5" />
-            Coming Soon
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-muted-foreground">
-            Calendar view with Google Calendar sync and .ics export will be
-            available in a future update.
-          </p>
-        </CardContent>
-      </Card>
+      {isLoading ? (
+        <div className="space-y-2">
+          <Skeleton className="h-10 w-48" />
+          <Skeleton className="h-[500px] w-full" />
+        </div>
+      ) : (
+        <MonthView tasks={taskSummaries} />
+      )}
     </div>
   );
 }

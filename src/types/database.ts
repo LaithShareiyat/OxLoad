@@ -148,6 +148,7 @@ export interface Database {
           url?: string | null;
           tags?: string[];
           recurrence_rule?: string | null;
+          notification_sent?: boolean;
         };
         Update: {
           id?: string;
@@ -172,6 +173,8 @@ export interface Database {
           url?: string | null;
           tags?: string[];
           recurrence_rule?: string | null;
+          notification_sent?: boolean;
+          canvas_last_synced_at?: string | null;
         };
         Relationships: [
           {

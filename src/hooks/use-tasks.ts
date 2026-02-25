@@ -3,7 +3,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { Task, TaskInsert, TaskUpdate, TaskStatus, TaskType, Priority } from "@/types/database";
-import { MOCK_TASKS } from "@/lib/mock-data";
+import { MOCK_TASKS, MOCK_COURSES, MOCK_USER } from "@/lib/mock-data";
 
 const isMock = process.env.NEXT_PUBLIC_MOCK_MODE === "true";
 
@@ -102,7 +102,43 @@ export function useCreateTask() {
   return useMutation({
     mutationFn: async (task: Omit<TaskInsert, "user_id">) => {
       if (isMock) {
-        return { ...task, id: `mock-${Date.now()}`, user_id: "mock-user-id" };
+        const now = new Date().toISOString();
+        const course = task.course_id
+          ? MOCK_COURSES.find((c) => c.id === task.course_id) ?? null
+          : null;
+        const newTask: TaskWithCourse = {
+          id: `mock-${Date.now()}`,
+          user_id: MOCK_USER.id,
+          course_id: task.course_id ?? null,
+          canvas_assignment_id: null,
+          canvas_submission_id: null,
+          title: task.title,
+          description: task.description ?? null,
+          task_type: (task.task_type ?? "todo") as TaskType,
+          due_date: task.due_date ?? null,
+          start_date: task.start_date ?? null,
+          estimated_minutes: task.estimated_minutes ?? null,
+          actual_minutes: 0,
+          priority: (task.priority ?? "medium") as Priority,
+          status: (task.status ?? "pending") as TaskStatus,
+          completed_at: null,
+          points_possible: task.points_possible ?? null,
+          points_earned: null,
+          grade_letter: null,
+          weight: null,
+          url: null,
+          tags: [],
+          recurrence_rule: null,
+          notification_sent: false,
+          canvas_last_synced_at: null,
+          created_at: now,
+          updated_at: now,
+          courses: course
+            ? { name: course.name, code: course.code, color: course.color }
+            : null,
+        };
+        MOCK_TASKS.push(newTask);
+        return newTask;
       }
 
       const {
@@ -135,6 +171,39 @@ export function useUpdateTask() {
       ...updates
     }: TaskUpdate & { id: string }) => {
       if (isMock) {
+        const idx = MOCK_TASKS.findIndex((t) => t.id === id);
+        if (idx !== -1) {
+          const existing = MOCK_TASKS[idx];
+          const resolvedCourse =
+            updates.course_id !== undefined
+              ? (MOCK_COURSES.find((c) => c.id === updates.course_id) ?? null)
+              : existing.courses
+              ? MOCK_COURSES.find(
+                  (c) => c.code === existing.courses?.code
+                ) ?? null
+              : null;
+          const updated: TaskWithCourse = {
+            ...existing,
+            ...updates,
+            updated_at: new Date().toISOString(),
+            completed_at:
+              updates.status === "completed" && !existing.completed_at
+                ? new Date().toISOString()
+                : existing.completed_at,
+            courses:
+              updates.course_id !== undefined
+                ? resolvedCourse
+                  ? {
+                      name: resolvedCourse.name,
+                      code: resolvedCourse.code,
+                      color: resolvedCourse.color,
+                    }
+                  : null
+                : existing.courses,
+          };
+          MOCK_TASKS[idx] = updated;
+          return updated;
+        }
         return { id, ...updates };
       }
 
@@ -166,7 +235,11 @@ export function useDeleteTask() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      if (isMock) return;
+      if (isMock) {
+        const idx = MOCK_TASKS.findIndex((t) => t.id === id);
+        if (idx !== -1) MOCK_TASKS.splice(idx, 1);
+        return;
+      }
 
       const { error } = await supabase.from("tasks").delete().eq("id", id);
       if (error) throw error;

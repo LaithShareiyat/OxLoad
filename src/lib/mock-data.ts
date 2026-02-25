@@ -1,12 +1,12 @@
-import { Task, Course, TaskType, Priority, TaskStatus } from "@/types/database";
+import { Task, Course, StudySession, TaskType, Priority, TaskStatus } from "@/types/database";
 import { addDays, subDays, addHours, format } from "date-fns";
 
 const now = new Date();
 
 export const MOCK_USER = {
   id: "mock-user-id",
-  email: "student@university.edu",
-  full_name: "Alex Johnson",
+  email: "laith.shareiyat@ox.ac.uk",
+  full_name: "Laith Shareiyat",
 };
 
 export const MOCK_COURSES: Course[] = [
@@ -17,7 +17,7 @@ export const MOCK_COURSES: Course[] = [
     name: "Introduction to Computer Science",
     code: "CS101",
     color: "#3B82F6",
-    term: "Spring 2026",
+    term: "Michaelmas 2025",
     instructor: "Dr. Smith",
     credits: 4,
     is_active: true,
@@ -32,7 +32,7 @@ export const MOCK_COURSES: Course[] = [
     name: "Linear Algebra",
     code: "MATH201",
     color: "#EF4444",
-    term: "Spring 2026",
+    term: "Hilary 2026",
     instructor: "Prof. Williams",
     credits: 3,
     is_active: true,
@@ -47,7 +47,7 @@ export const MOCK_COURSES: Course[] = [
     name: "Academic Writing",
     code: "ENG150",
     color: "#10B981",
-    term: "Spring 2026",
+    term: "Hilary 2026",
     instructor: "Dr. Chen",
     credits: 3,
     is_active: true,
@@ -62,7 +62,7 @@ export const MOCK_COURSES: Course[] = [
     name: "Data Structures & Algorithms",
     code: "CS301",
     color: "#8B5CF6",
-    term: "Spring 2026",
+    term: "Trinity 2026",
     instructor: "Prof. Garcia",
     credits: 4,
     is_active: true,
@@ -315,5 +315,106 @@ export const MOCK_TASKS = [
     points_possible: 30,
     points_earned: 28,
     grade_letter: "A",
+  }),
+];
+
+function mockSession(
+  id: string,
+  overrides: Partial<StudySession> & { task_id?: string | null; course_id?: string | null }
+): StudySession {
+  return {
+    id,
+    user_id: MOCK_USER.id,
+    task_id: overrides.task_id ?? null,
+    course_id: overrides.course_id ?? null,
+    session_type: "pomodoro",
+    started_at: overrides.started_at ?? now.toISOString(),
+    ended_at: overrides.ended_at ?? addHours(new Date(overrides.started_at ?? now), 0.5).toISOString(),
+    duration_minutes: overrides.duration_minutes ?? 25,
+    pomodoro_count: overrides.pomodoro_count ?? 1,
+    notes: null,
+    focus_rating: overrides.focus_rating ?? null,
+    created_at: overrides.started_at ?? now.toISOString(),
+  };
+}
+
+export const MOCK_STUDY_SESSIONS: StudySession[] = [
+  // Today
+  mockSession("session-1", {
+    task_id: "task-1",
+    course_id: "course-1",
+    started_at: addHours(now, -2).toISOString(),
+    ended_at: addHours(now, -1.5).toISOString(),
+    duration_minutes: 25,
+    pomodoro_count: 1,
+    focus_rating: 4,
+  }),
+  mockSession("session-2", {
+    task_id: "task-9",
+    course_id: "course-2",
+    started_at: addHours(now, -1).toISOString(),
+    ended_at: addHours(now, -0.1).toISOString(),
+    duration_minutes: 50,
+    pomodoro_count: 2,
+    focus_rating: 5,
+  }),
+  // Yesterday
+  mockSession("session-3", {
+    task_id: "task-3",
+    course_id: "course-3",
+    started_at: addHours(subDays(now, 1), -3).toISOString(),
+    ended_at: addHours(subDays(now, 1), -1).toISOString(),
+    duration_minutes: 50,
+    pomodoro_count: 2,
+    focus_rating: 3,
+  }),
+  mockSession("session-4", {
+    task_id: "task-5",
+    course_id: "course-4",
+    started_at: addHours(subDays(now, 1), -5).toISOString(),
+    ended_at: addHours(subDays(now, 1), -4.5).toISOString(),
+    duration_minutes: 25,
+    pomodoro_count: 1,
+    focus_rating: 4,
+  }),
+  // 2 days ago
+  mockSession("session-5", {
+    task_id: "task-13",
+    course_id: "course-4",
+    started_at: addHours(subDays(now, 2), -2).toISOString(),
+    ended_at: addHours(subDays(now, 2), -0.75).toISOString(),
+    duration_minutes: 75,
+    pomodoro_count: 3,
+    focus_rating: 5,
+  }),
+  // 3 days ago
+  mockSession("session-6", {
+    task_id: "task-1",
+    course_id: "course-1",
+    started_at: addHours(subDays(now, 3), -3).toISOString(),
+    ended_at: addHours(subDays(now, 3), -2.5).toISOString(),
+    duration_minutes: 25,
+    pomodoro_count: 1,
+    focus_rating: 3,
+  }),
+  mockSession("session-7", {
+    task_id: "task-3",
+    course_id: "course-3",
+    started_at: addHours(subDays(now, 3), -1).toISOString(),
+    ended_at: addHours(subDays(now, 3), 0).toISOString(),
+    duration_minutes: 50,
+    pomodoro_count: 2,
+    focus_rating: 4,
+  }),
+  // 5 days ago
+  mockSession("session-8", {
+    task_id: "task-4",
+    course_id: "course-2",
+    session_type: "free",
+    started_at: addHours(subDays(now, 5), -4).toISOString(),
+    ended_at: addHours(subDays(now, 5), -2).toISOString(),
+    duration_minutes: 120,
+    pomodoro_count: 0,
+    focus_rating: 4,
   }),
 ];

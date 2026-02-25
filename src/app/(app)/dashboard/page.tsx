@@ -16,10 +16,12 @@ import {
   Clock,
   AlertTriangle,
   GraduationCap,
+  Timer,
 } from "lucide-react";
-import { format, isToday, isTomorrow, isPast, addDays } from "date-fns";
+import { format, isToday, isTomorrow, isPast, addDays, startOfDay } from "date-fns";
 import { cn } from "@/lib/utils";
 import { generateDayPlans, generateInsights } from "@/lib/workload/engine";
+import { useStudySessions } from "@/hooks/use-study-sessions";
 import Link from "next/link";
 
 export default function DashboardPage() {
@@ -29,6 +31,14 @@ export default function DashboardPage() {
   const { data: allTasks } = useTasks();
   const { data: courses, isLoading: coursesLoading } = useCourses();
   const updateTask = useUpdateTask();
+
+  // Today's study sessions
+  const todayStart = format(startOfDay(new Date()), "yyyy-MM-dd'T'00:00:00");
+  const { data: todaySessions } = useStudySessions({ startDate: todayStart });
+  const studyMinutesToday = (todaySessions ?? []).reduce(
+    (sum, s) => sum + (s.duration_minutes ?? 0),
+    0
+  );
 
   // Generate workload data
   const { dayPlans, insights } = useMemo(() => {
@@ -70,7 +80,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Stats cards */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <StatsCard
           title="Active Tasks"
           value={tasksLoading ? "-" : String(tasks?.length || 0)}
@@ -97,6 +107,14 @@ export default function DashboardPage() {
           value={coursesLoading ? "-" : String(courses?.length || 0)}
           icon={<GraduationCap className="h-4 w-4 text-muted-foreground" />}
           loading={coursesLoading}
+        />
+        <StatsCard
+          title="Study Today"
+          value={studyMinutesToday >= 60
+            ? `${(studyMinutesToday / 60).toFixed(1)}h`
+            : `${studyMinutesToday}m`}
+          icon={<Timer className="h-4 w-4 text-muted-foreground" />}
+          loading={false}
         />
       </div>
 

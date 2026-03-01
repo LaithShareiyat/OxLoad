@@ -2,11 +2,15 @@
 
 import { useMemo } from "react";
 import { useTasks } from "@/hooks/use-tasks";
+import { useCalendarEvents } from "@/hooks/use-calendar-events";
 import { MonthView } from "@/components/calendar/month-view";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function CalendarPage() {
-  const { data: tasks, isLoading } = useTasks();
+  const { data: tasks, isLoading: tasksLoading } = useTasks();
+  const { data: events, isLoading: eventsLoading } = useCalendarEvents();
+
+  const isLoading = tasksLoading || eventsLoading;
 
   const taskSummaries = useMemo(
     () =>
@@ -18,6 +22,18 @@ export default function CalendarPage() {
         status: t.status,
       })),
     [tasks]
+  );
+
+  const eventSummaries = useMemo(
+    () =>
+      (events || []).map((e) => ({
+        id: e.id,
+        title: e.title,
+        start_time: e.start_time,
+        end_time: e.end_time,
+        color: e.color ?? "#10B981",
+      })),
+    [events]
   );
 
   return (
@@ -35,7 +51,7 @@ export default function CalendarPage() {
           <Skeleton className="h-[500px] w-full" />
         </div>
       ) : (
-        <MonthView tasks={taskSummaries} />
+        <MonthView tasks={taskSummaries} events={eventSummaries} />
       )}
     </div>
   );

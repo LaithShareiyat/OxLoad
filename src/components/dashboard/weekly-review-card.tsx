@@ -3,7 +3,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { format } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
@@ -17,13 +16,17 @@ import {
   AlertTriangle,
   ChevronDown,
   ChevronUp,
+  CalendarPlus,
+  CalendarCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { AIRecommendation, WeeklyReviewResponse } from "@/app/api/ai/weekly-review/route";
+import type { AIRecommendation, WeeklyReviewResponse, CalendarEventPayload } from "@/app/api/ai/weekly-review/route";
 import type { WorkloadInsight } from "@/lib/workload/engine";
 import type { StudySession } from "@/types/database";
+import { useCreateCalendarEvent } from "@/hooks/use-calendar-events";
 
 const STORAGE_KEY = "oxload_weekly_review";
+const ADDED_KEY = "oxload_added_events";
 
 const CATEGORY_ICONS: Record<AIRecommendation["category"], React.ReactNode> = {
   urgent: <AlertTriangle className="h-4 w-4" />,
@@ -73,7 +76,40 @@ interface WeeklyReviewCardProps {
   insights: WorkloadInsight[];
 }
 
-function RecommendationCard({ rec }: { rec: AIRecommendation }) {
+function downloadIcs(event: CalendarEventPayload) {
+  const fmt = (d: string) =>
+    d.replace(/[-:]/g, "").replace("T", "T").slice(0, 15) + "Z";
+  const content = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//OxLoad//EN",
+    "BEGIN:VEVENT",
+    `UID:${Date.now()}@oxload`,
+    `DTSTAMP:${fmt(new Date().toISOString())}`,
+    `DTSTART:${fmt(event.start_time)}`,
+    `DTEND:${fmt(event.end_time)}`,
+    `SUMMARY:${event.title}`,
+    `DESCRIPTION:${event.description.replace(/\n/g, "\\n")}`,
+    "END:VEVENT",
+    "END:VCALENDAR",
+  ].join("\r\n");
+  const blob = new Blob([content], { type: "text/calendar" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `${event.title.replace(/\s+/g, "-")}.ics`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+}
+
+function RecommendationCard({
+  rec,
+  added,
+  onAddToCalendar,
+}: {
+  rec: AIRecommendation;
+  added: boolean;
+  onAddToCalendar: (rec: AIRecommendation) => void;
+}) {
   const [expanded, setExpanded] = useState(false);
   const config = PRIORITY_CONFIG[rec.priority];
 
@@ -107,26 +143,61 @@ function RecommendationCard({ rec }: { rec: AIRecommendation }) {
 
       <p className="text-xs text-muted-foreground leading-relaxed">{rec.reason}</p>
 
-      <button
-        onClick={() => setExpanded((v) => !v)}
-        className="flex items-center gap-1 text-xs text-primary hover:underline focus:outline-none"
-      >
-        {expanded ? (
-          <>
-            <ChevronUp className="h-3 w-3" />
-            Hide action
-          </>
-        ) : (
-          <>
-            <ChevronDown className="h-3 w-3" />
-            Show action
-          </>
+      <div className="flex items-center gap-3">
+        <button
+          onClick={() => setExpanded((v) => !v)}
+          className="flex items-center gap-1 text-xs text-primary hover:underline focus:outline-none"
+        >
+          {expanded ? (
+            <>
+              <ChevronUp className="h-3 w-3" />
+              Hide action
+            </>
+          ) : (
+            <>
+              <ChevronDown className="h-3 w-3" />
+              Show action
+            </>
+          )}
+        </button>
+
+        {rec.calendar_event && (
+          <button
+            onClick={() => onAddToCalendar(rec)}
+            disabled={added}
+            className={cn(
+              "flex items-center gap-1 text-xs focus:outline-none transition-colors",
+              added
+                ? "text-emerald-600 dark:text-emerald-400 cursor-default"
+                : "text-muted-foreground hover:text-emerald-600 dark:hover:text-emerald-400"
+            )}
+          >
+            {added ? (
+              <>
+                <CalendarCheck className="h-3.5 w-3.5" />
+                Added
+              </>
+            ) : (
+              <>
+                <CalendarPlus className="h-3.5 w-3.5" />
+                Add to calendar
+              </>
+            )}
+          </button>
         )}
-      </button>
+      </div>
 
       {expanded && (
         <p className="text-xs text-emerald-600 dark:text-emerald-400 italic leading-relaxed border-l-2 border-emerald-400 pl-2">
           {rec.action}
+        </p>
+      )}
+
+      {rec.calendar_event && (
+        <p className="text-xs text-muted-foreground/70">
+          {format(new Date(rec.calendar_event.start_time), "EEE d MMM, h:mm a")}
+          {" – "}
+          {format(new Date(rec.calendar_event.end_time), "h:mm a")}
         </p>
       )}
     </div>
@@ -140,6 +211,9 @@ export function WeeklyReviewCard({
 }: WeeklyReviewCardProps) {
   const [result, setResult] = useState<WeeklyReviewResponse | null>(null);
   const [loading, setLoading] = useState(false);
+  const [addedIds, setAddedIds] = useState<Set<string>>(new Set());
+
+  const createCalendarEvent = useCreateCalendarEvent();
 
   // Load from localStorage on mount
   useEffect(() => {
@@ -147,12 +221,16 @@ export function WeeklyReviewCard({
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
         const parsed = JSON.parse(stored) as WeeklyReviewResponse;
-        const age =
-          Date.now() - new Date(parsed.generatedAt).getTime();
+        const age = Date.now() - new Date(parsed.generatedAt).getTime();
         const sevenDays = 7 * 24 * 60 * 60 * 1000;
         if (age < sevenDays) {
           setResult(parsed);
         }
+      }
+
+      const addedStored = localStorage.getItem(ADDED_KEY);
+      if (addedStored) {
+        setAddedIds(new Set(JSON.parse(addedStored) as string[]));
       }
     } catch {
       // ignore parse errors
@@ -162,13 +240,11 @@ export function WeeklyReviewCard({
   const generate = useCallback(async () => {
     setLoading(true);
     try {
-      // Format sessions by course for the prompt
       const sessionSummary = sessions.map((s) => ({
         course: s.course_id,
         duration_minutes: s.duration_minutes,
       }));
 
-      // Slim down tasks for the prompt (avoid sending massive payload)
       const taskPayload = tasks.map((t) => ({
         title: t.title,
         due_date: t.due_date,
@@ -199,7 +275,10 @@ export function WeeklyReviewCard({
 
       const data = (await res.json()) as WeeklyReviewResponse;
       setResult(data);
+      // Reset added state when review is refreshed
+      setAddedIds(new Set());
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      localStorage.removeItem(ADDED_KEY);
       toast.success("Weekly review generated");
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to generate review";
@@ -208,6 +287,44 @@ export function WeeklyReviewCard({
       setLoading(false);
     }
   }, [tasks, sessions, insights]);
+
+  const handleAddToCalendar = useCallback(
+    (rec: AIRecommendation) => {
+      if (!rec.calendar_event) return;
+      const ev = rec.calendar_event;
+
+      createCalendarEvent.mutate(
+        {
+          course_id: null,
+          google_event_id: null,
+          title: ev.title,
+          description: ev.description,
+          location: null,
+          event_type: ev.event_type,
+          start_time: ev.start_time,
+          end_time: ev.end_time,
+          is_all_day: false,
+          recurrence_rule: null,
+          color: "#10B981",
+          google_last_synced_at: null,
+        },
+        {
+          onSuccess: () => {
+            downloadIcs(ev);
+            const next = new Set(addedIds);
+            next.add(rec.id);
+            setAddedIds(next);
+            localStorage.setItem(ADDED_KEY, JSON.stringify([...next]));
+            toast.success("Added to calendar & .ics downloaded");
+          },
+          onError: (err) => {
+            toast.error(err instanceof Error ? err.message : "Failed to add event");
+          },
+        }
+      );
+    },
+    [createCalendarEvent, addedIds]
+  );
 
   const generatedLabel = result
     ? `Generated ${format(new Date(result.generatedAt), "EEE, d MMM 'at' h:mm a")}`
@@ -264,7 +381,12 @@ export function WeeklyReviewCard({
             {/* Recommendation cards */}
             <div className="grid gap-3 sm:grid-cols-2">
               {result.recommendations.map((rec) => (
-                <RecommendationCard key={rec.id} rec={rec} />
+                <RecommendationCard
+                  key={rec.id}
+                  rec={rec}
+                  added={addedIds.has(rec.id)}
+                  onAddToCalendar={handleAddToCalendar}
+                />
               ))}
             </div>
           </>

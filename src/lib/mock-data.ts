@@ -1,4 +1,4 @@
-import { Task, Course, StudySession, TaskType, Priority, TaskStatus } from "@/types/database";
+import { Task, Course, StudySession, CalendarEvent, TaskType, Priority, TaskStatus } from "@/types/database";
 import { addDays, subDays, addHours, format } from "date-fns";
 
 const now = new Date();
@@ -418,3 +418,5 @@ export const MOCK_STUDY_SESSIONS: StudySession[] = [
     focus_rating: 4,
   }),
 ];
+
+export const MOCK_CALENDAR_EVENTS: CalendarEvent[] = [];

@@ -8,7 +8,6 @@ import {
   endOfWeek,
   eachDayOfInterval,
   format,
-  isSameDay,
   isToday,
   isSameMonth,
   addMonths,
@@ -27,13 +26,22 @@ type TaskSummary = {
   status: string;
 };
 
+type EventSummary = {
+  id: string;
+  title: string;
+  start_time: string;
+  end_time: string;
+  color: string;
+};
+
 interface MonthViewProps {
   tasks: TaskSummary[];
+  events?: EventSummary[];
 }
 
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
-export function MonthView({ tasks }: MonthViewProps) {
+export function MonthView({ tasks, events = [] }: MonthViewProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
 
   const days = useMemo(() => {
@@ -54,6 +62,16 @@ export function MonthView({ tasks }: MonthViewProps) {
     }
     return map;
   }, [tasks]);
+
+  const eventsByDay = useMemo(() => {
+    const map = new Map<string, EventSummary[]>();
+    for (const event of events) {
+      const key = format(new Date(event.start_time), "yyyy-MM-dd");
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(event);
+    }
+    return map;
+  }, [events]);
 
   return (
     <div className="space-y-4">
@@ -106,8 +124,11 @@ export function MonthView({ tasks }: MonthViewProps) {
           {days.map((day, i) => {
             const key = format(day, "yyyy-MM-dd");
             const dayTasks = tasksByDay.get(key) || [];
+            const dayEvents = eventsByDay.get(key) || [];
             const inMonth = isSameMonth(day, currentMonth);
             const today = isToday(day);
+            const totalItems = dayTasks.length + dayEvents.length;
+            const maxVisible = 3;
 
             return (
               <div
@@ -133,9 +154,20 @@ export function MonthView({ tasks }: MonthViewProps) {
                   </span>
                 </div>
 
-                {/* Tasks */}
+                {/* Events (study sessions from AI) */}
                 <div className="space-y-0.5">
-                  {dayTasks.slice(0, 3).map((task) => (
+                  {dayEvents.slice(0, maxVisible).map((event) => (
+                    <div
+                      key={event.id}
+                      className="truncate rounded border border-dashed border-emerald-500 bg-emerald-500/10 px-1 py-0.5 text-xs text-emerald-700 dark:text-emerald-400"
+                      title={`${event.title} (${format(new Date(event.start_time), "h:mm a")}–${format(new Date(event.end_time), "h:mm a")})`}
+                    >
+                      {format(new Date(event.start_time), "h:mm a")} {event.title}
+                    </div>
+                  ))}
+
+                  {/* Tasks */}
+                  {dayTasks.slice(0, Math.max(0, maxVisible - dayEvents.slice(0, maxVisible).length)).map((task) => (
                     <Link key={task.id} href={`/tasks/${task.id}`}>
                       <div
                         className={cn(
@@ -149,9 +181,10 @@ export function MonthView({ tasks }: MonthViewProps) {
                       </div>
                     </Link>
                   ))}
-                  {dayTasks.length > 3 && (
+
+                  {totalItems > maxVisible && (
                     <div className="px-1 text-xs text-muted-foreground">
-                      +{dayTasks.length - 3} more
+                      +{totalItems - maxVisible} more
                     </div>
                   )}
                 </div>

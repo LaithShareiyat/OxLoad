@@ -11,6 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { WorkloadHeatmap } from "@/components/dashboard/workload-heatmap";
 import { InsightsCard } from "@/components/dashboard/insights-card";
 import { SyncButton } from "@/components/dashboard/sync-button";
+import { WeeklyReviewCard } from "@/components/dashboard/weekly-review-card";
 import {
   CheckSquare,
   Clock,
@@ -39,6 +40,10 @@ export default function DashboardPage() {
     (sum, s) => sum + (s.duration_minutes ?? 0),
     0
   );
+
+  // Last 7 days study sessions (for AI weekly review)
+  const sevenDaysAgo = format(addDays(new Date(), -7), "yyyy-MM-dd'T'00:00:00");
+  const { data: weekSessions } = useStudySessions({ startDate: sevenDaysAgo });
 
   // Generate workload data
   const { dayPlans, insights } = useMemo(() => {
@@ -123,6 +128,13 @@ export default function DashboardPage() {
         <WorkloadHeatmap dayPlans={dayPlans} />
         <InsightsCard insights={insights} />
       </div>
+
+      {/* AI Weekly Review */}
+      <WeeklyReviewCard
+        tasks={allTasks ?? []}
+        sessions={weekSessions ?? []}
+        insights={insights}
+      />
 
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Upcoming tasks */}
